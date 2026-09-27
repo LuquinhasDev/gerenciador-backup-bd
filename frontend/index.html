@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Plataforma de Backup</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="container">
+
+        <header>
+            <h1>Plataforma de Gerenciamento de Backup</h1>
+            <p>
+                Configure os parâmetros para execução do backup.
+            </p>
+        </header>
+
+
+        <!-- CONEXÃO E DESTINO -->
+
+        <section class="card">
+
+            <h2>Conexão e Destino</h2>
+
+            <div class="form-group">
+
+                <label for="database">
+                    Banco de Dados
+                </label>
+
+                <div class="connection-row">
+
+                    <input
+                        type="text"
+                        id="database"
+                        value="gestao_veiculos"
+                    >
+
+                    <button id="testConnection">
+                        Testar Conexão
+                    </button>
+
+                </div>
+
+                <span id="connectionStatus"></span>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="mainPath">
+                    Diretório Principal
+                </label>
+
+                <input
+                    type="text"
+                    id="mainPath"
+                    placeholder="C:\backups\principal"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="secondaryPath">
+                    Diretório Secundário
+                    <span>(Opcional)</span>
+                </label>
+
+                <input
+                    type="text"
+                    id="secondaryPath"
+                    placeholder="D:\backups\copia"
+                >
+
+            </div>
+
+        </section>
+
+
+        <!-- MANUTENÇÃO E SEGURANÇA -->
+
+        <section class="card">
+
+            <h2>Manutenção e Segurança</h2>
+
+            <label class="checkbox">
+
+                <input
+                    type="checkbox"
+                    id="encrypt"
+                >
+
+                Criptografar AES
+
+            </label>
+
+
+            <label class="checkbox">
+
+                <input
+                    type="checkbox"
+                    id="compress"
+                >
+
+                Compactar ZIP
+
+            </label>
+
+
+            <label class="checkbox">
+
+                <input
+                    type="checkbox"
+                    id="forceMaintenance"
+                >
+
+                Forçar Manutenção Completa
+
+            </label>
+
+
+            <div class="form-group retention">
+
+                <label for="retention">
+                    Manter os últimos backups
+                </label>
+
+                <input
+                    type="number"
+                    id="retention"
+                    value="5"
+                    min="1"
+                >
+
+            </div>
+
+        </section>
+
+
+        <!-- AÇÃO -->
+
+        <section class="actions">
+
+            <button
+                id="startBackup"
+                class="primary-button"
+            >
+                Iniciar Backup
+            </button>
+
+        </section>
+
+
+        <!-- STATUS -->
+
+        <section
+            id="message"
+            class="message hidden"
+        ></section>
+
+    </main>
+
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
