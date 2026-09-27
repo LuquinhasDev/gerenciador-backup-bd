@@ -2,16 +2,17 @@
 
 Projeto desenvolvido para a disciplina de Banco de Dados.
 
-A aplicação tem como objetivo fornecer uma plataforma para configuração
-e gerenciamento do processo de backup de um banco de dados PostgreSQL.
+A plataforma tem como objetivo fornecer uma interface para configuração
+e gerenciamento de processos de backup de um banco de dados PostgreSQL.
 
 ## Domínio
 
 Gestão de veículos.
 
-O banco simula dados de uma concessionária/locadora de veículos.
+O sistema utiliza um banco de dados PostgreSQL contendo informações
+relacionadas a marcas, veículos e histórico de manutenção.
 
-## Tecnologias
+## Tecnologias utilizadas
 
 - HTML
 - CSS
@@ -21,37 +22,26 @@ O banco simula dados de uma concessionária/locadora de veículos.
 - PostgreSQL
 - pgAdmin
 
-## Estrutura do banco
+## Estrutura do projeto
 
-O banco possui as seguintes tabelas:
-
-- marcas
-- veiculos
-- historico_manutencao
-
-## Como executar
-
-### 1. Criar o banco
-
-Criar no PostgreSQL um banco chamado:
-
-gestao_veiculos
-
-### 2. Criar as tabelas
-
-Executar:
-
-database/01_create_tables.sql
-
-### 3. Inserir os dados
-
-Executar:
-
-database/02_insert_data.sql
-
-### 4. Instalar as dependências
-
-Entrar na pasta backend:
-
-```bash
-cd backend
+```text
+plataforma-backup/
+│
+├── backend/
+│   ├── server.js
+│   ├── database.js
+│   ├── .env.example
+│   ├── package.json
+│   └── package-lock.json
+│
+├── database/
+│   ├── 01_create_tables.sql
+│   └── 02_insert_data.sql
+│
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+│
+├── .gitignore
+└── README.md
