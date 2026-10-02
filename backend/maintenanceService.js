@@ -1,0 +1,166 @@
+const pool = require("./database");
+
+async function buscarUltimaManutencao() {
+    const resultado = await pool.query(`
+        SELECT
+            data_hora,
+            data_fim,
+            regra_aplicada,
+            status
+        FROM historico_manutencao
+        WHERE tipo_operacao = 'MANUTENCAO'
+          AND status = 'SUCESSO'
+          AND data_hora IS NOT NULL
+        ORDER BY data_hora DESC
+        LIMIT 1
+    `);
+
+    return resultado.rows[0] || null;
+}
+
+function decidirManutencao(ultimaManutencao, forcarManutencao = false) {
+
+    if (forcarManutencao) {
+        return {
+            acao: "VACUUM_FULL_ANALYZE",
+            regra: "MANUTENCAO_MANUAL"
+        };
+    }
+
+    if (!ultimaManutencao) {
+        return {
+            acao: "VACUUM_FULL_ANALYZE",
+            regra: "SEM_HISTORICO"
+        };
+    }
+
+    const dataUltima = new Date(
+        ultimaManutencao.data_fim || ultimaManutencao.data_hora
+    );
+
+    const agora = new Date();
+
+    const diferencaMs = agora - dataUltima;
+
+    const dias = diferencaMs / (1000 * 60 * 60 * 24);
+
+    if (dias < 30) {
+        return {
+            acao: "NENHUMA",
+            regra: "MENOS_DE_30_DIAS",
+            dias
+        };
+    }
+
+    if (dias <= 60) {
+        return {
+            acao: "VACUUM",
+            regra: "ENTRE_30_E_60_DIAS",
+            dias
+        };
+    }
+
+    return {
+        acao: "VACUUM_FULL_ANALYZE",
+        regra: "MAIS_DE_60_DIAS",
+        dias
+    };
+}
+
+async function executarManutencao(acao) {
+
+    if (acao === "NENHUMA") {
+        return {
+            sucesso: true,
+            mensagem: "Nenhuma manutenção necessária."
+        };
+    }
+
+    const inicio = new Date();
+
+    try {
+
+        if (acao === "VACUUM") {
+            await pool.query("VACUUM");
+        }
+
+        if (acao === "VACUUM_FULL_ANALYZE") {
+            await pool.query("VACUUM FULL ANALYZE");
+        }
+
+        const fim = new Date();
+
+        return {
+            sucesso: true,
+            inicio,
+            fim,
+            mensagem: `Manutenção ${acao} executada com sucesso.`
+        };
+
+    } catch (erro) {
+
+        const fim = new Date();
+
+        return {
+            sucesso: false,
+            inicio,
+            fim,
+            mensagem: erro.message
+        };
+    }
+}
+
+async function registrarManutencao({
+    inicio,
+    fim,
+    regra,
+    status,
+    mensagem
+}) {
+
+    const duracao =
+        fim && inicio
+            ? Math.round((fim - inicio) / 1000)
+            : null;
+
+    await pool.query(`
+        INSERT INTO historico_manutencao
+        (
+            data_hora,
+            regra_aplicada,
+            duracao,
+            status,
+            tipo_operacao,
+            data_inicio,
+            data_fim,
+            mensagem,
+            banco_dados
+        )
+        VALUES
+        (
+            NOW(),
+            $1,
+            $2,
+            $3,
+            'MANUTENCAO',
+            $4,
+            $5,
+            $6,
+            current_database()
+        )
+    `, [
+        regra,
+        duracao,
+        status,
+        inicio,
+        fim,
+        mensagem
+    ]);
+}
+
+module.exports = {
+    buscarUltimaManutencao,
+    decidirManutencao,
+    executarManutencao,
+    registrarManutencao
+};
