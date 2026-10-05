@@ -1,89 +1,143 @@
-const express = require("express");
-const cors = require("cors");
+let pool = null;
 
-const pool = require("./database");
+const express =
+    require("express");
+
+const cors =
+    require("cors");
+
+const path =
+    require("path");
 
 const {
+    criarPool,
+    validarConfig,
+    testarConexao,
+    fecharPool
+} = require("./database");
+
+const { restaurarBackup } =
+    require("./restoreService");
+
+const {
+
     iniciarBackup,
+
     obterJob
+
 } = require("./backupJobService");
 
-const app = express();
+const {
+    criptografarAES,
+    compactarZIP,
+    protegerSegredo
+} = require("./securityService");
 
-const PORT = 3000;
+const {
 
+    aplicarRetencao,
 
-/*
-|--------------------------------------------------------------------------
-| Middlewares
-|--------------------------------------------------------------------------
-*/
+    copiarParaDestino
 
-app.use(cors());
-
-app.use(express.json());
-
-
-/*
-|--------------------------------------------------------------------------
-| Teste da API
-|--------------------------------------------------------------------------
-*/
-
-app.get("/api/status", (req, res) => {
-
-    res.json({
-        sucesso: true,
-        mensagem: "Servidor funcionando."
-    });
-
-});
+} = require("./fileService");
 
 
-/*
-|--------------------------------------------------------------------------
-| Testar conexão com o banco
-|--------------------------------------------------------------------------
-*/
+const {
 
-app.get("/api/veiculos", async (req, res) => {
+    buscarHistorico,
 
-    try {
+    buscarLogs
 
-        const resultado = await pool.query(`
-            SELECT *
-            FROM veiculos
-        `);
+} = require("./logService");
 
-        res.json(resultado.rows);
 
-    } catch (erro) {
+const app =
+    express();
 
-        console.error(
-            "Erro ao consultar banco:",
-            erro.message
-        );
 
-        res.status(500).json({
-            sucesso: false,
-            erro: "Erro ao conectar ou consultar o banco."
-        });
+app.use(
+    cors()
+);
+
+
+app.use(
+    express.json()
+);
+
+
+// ======================================================
+// CONFIGURAÇÃO ATIVA
+// ======================================================
+
+let conexaoAtiva =
+    null;
+
+
+// ======================================================
+// TESTAR CONEXÃO
+// ======================================================
+
+app.post(
+    "/api/conexao/testar",
+    async (req, res) => {
+
+        try {
+
+            const conexao =
+                validarConfig(
+                    req.body
+                );
+
+
+            const resultado =
+                await testarConexao(
+                    conexao
+                );
+
+
+            // Guarda somente a configuração.
+            // NÃO guarda um pool encerrado.
+            conexaoAtiva =
+                conexao;
+
+
+            res.json({
+
+                sucesso:
+                    true,
+
+                mensagem:
+                    "Conexão realizada com sucesso.",
+
+                registros:
+                    resultado.total
+
+            });
+
+
+        } catch (erro) {
+
+            console.error(
+                "[CONEXAO]",
+                erro.message
+            );
+
+
+            res.status(500).json({
+
+                sucesso:
+                    false,
+
+                mensagem:
+                    erro.message
+
+            });
+
+        }
 
     }
+);
 
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| INICIAR BACKUP
-|--------------------------------------------------------------------------
-|
-| O backup é iniciado em segundo plano.
-|
-| O frontend recebe imediatamente o ID do processo.
-|
-*/
 
 // ======================================================
 // INICIAR BACKUP
@@ -96,29 +150,119 @@ app.post(
         try {
 
             const {
+                host,
+                port,
+                database,
+                user,
+                password,
 
                 diretorioPrincipal,
-
                 diretorioSecundario,
 
                 criptografar,
-
                 compactar,
 
                 quantidade,
-
                 forcarManutencao
 
             } = req.body;
 
 
+            // ============================================
+            // CONFIGURAÇÃO DO BANCO
+            // ============================================
+
+            console.log("CONFIGURAÇÃO RECEBIDA NO BACKUP:");
+            console.log({
+                host,
+                port,
+                database,
+                user,
+                password: password ? "***" : undefined
+            });
+
+
+            const conexao = validarConfig({
+
+                host,
+                port,
+                database,
+                user,
+                password
+
+            });
+
+
+            // ============================================
+            // DIRETÓRIO
+            // ============================================
+
+            if (
+                !diretorioPrincipal ||
+                typeof diretorioPrincipal !== "string"
+            ) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "O diretório principal é obrigatório."
+
+                });
+
+            }
+
+
+            // ============================================
+            // RETENÇÃO
+            // ============================================
+
+            const quantidadeNumerica =
+                Number(quantidade);
+
+
+            if (
+                !Number.isInteger(quantidadeNumerica) ||
+                quantidadeNumerica < 1
+            ) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "A quantidade de backups deve ser um número inteiro maior que zero."
+
+                });
+
+            }
+
+
+            // ============================================
+            // SALVAR CONEXÃO ATIVA
+            // ============================================
+
+            conexaoAtiva = conexao;
+
+
+            // ============================================
+            // CRIAR JOB
+            // ============================================
+
             const job =
                 iniciarBackup({
+
+                    conexaoBanco:
+                        conexao,
+
+                    bancoDados:
+                        database,
 
                     diretorioPrincipal,
 
                     destinoSecundario:
-                        diretorioSecundario,
+                        diretorioSecundario || null,
 
                     criptografar:
                         criptografar === true,
@@ -127,7 +271,7 @@ app.post(
                         compactar === true,
 
                     quantidadeRetencao:
-                        Number(quantidade),
+                        quantidadeNumerica,
 
                     forcarManutencao:
                         forcarManutencao === true
@@ -135,15 +279,17 @@ app.post(
                 });
 
 
-            res.status(202).json({
+            return res.status(202).json({
 
                 sucesso: true,
 
                 jobId:
-                    job.jobId
+                    job.id,
+
+                mensagem:
+                    "Backup iniciado com sucesso."
 
             });
-
 
         } catch (erro) {
 
@@ -152,8 +298,7 @@ app.post(
                 erro
             );
 
-
-            res.status(500).json({
+            return res.status(500).json({
 
                 sucesso: false,
 
@@ -167,195 +312,178 @@ app.post(
     }
 );
 
-app.post("/api/backup/iniciar", async (req, res) => {
+// ======================================================
+// RESTAURAR BACKUP
+// ======================================================
 
-    try {
+app.post(
+    "/api/backup/restaurar",
+    async (req, res) => {
 
-        const {
-            forcarManutencao = false,
-            criptografar = false,
-            compactar = false,
-            quantidadeRetencao = 5,
-            diretorioPrincipal = null,
-            destinoSecundario = null
-        } = req.body;
+        let bancoPool = null;
 
+        try {
 
-        /*
-         * Validação do diretório principal
-         */
-
-        if (
-            !diretorioPrincipal ||
-            typeof diretorioPrincipal !== "string" ||
-            diretorioPrincipal.trim() === ""
-        ) {
-
-            return res.status(400).json({
-
-                sucesso: false,
-
-                mensagem:
-                    "O diretório principal é obrigatório."
-
-            });
-
-        }
+            const {
+                execucaoId,
+                host,
+                port,
+                database,
+                user,
+                password
+            } = req.body;
 
 
-        /*
-         * Validação da retenção
-         */
+            // ============================================
+            // VALIDAR ID
+            // ============================================
 
-        const quantidade =
-            Number(quantidadeRetencao);
+            if (!execucaoId) {
 
+                return res.status(400).json({
 
-        if (
-            !Number.isInteger(quantidade) ||
-            quantidade < 1
-        ) {
+                    sucesso: false,
 
-            return res.status(400).json({
+                    mensagem:
+                        "execucaoId é obrigatório."
 
-                sucesso: false,
-
-                mensagem:
-                    "A quantidade de backups deve ser um número inteiro maior que zero."
-
-            });
-
-        }
-
-
-        /*
-         * Validação do destino secundário
-         */
-
-        if (
-            destinoSecundario !== null &&
-            destinoSecundario !== undefined &&
-            typeof destinoSecundario !== "string"
-        ) {
-
-            return res.status(400).json({
-
-                sucesso: false,
-
-                mensagem:
-                    "O diretório secundário informado é inválido."
-
-            });
-
-        }
-
-
-        /*
-         * Cria o job
-         */
-
-
-        const job =
-            iniciarBackup({
-
-                forcarManutencao:
-                    Boolean(forcarManutencao),
-
-                criptografar:
-                    Boolean(criptografar),
-
-                compactar:
-                    Boolean(compactar),
-
-                quantidadeRetencao:
-                    quantidade,
-
-                diretorioPrincipal:
-                    diretorioPrincipal,
-
-                destinoSecundario:
-                    destinoSecundario || null
-
-            });
-
-
-        /*
-         * Retorna imediatamente.
-         *
-         * O backup continua sendo executado
-         * em segundo plano.
-         */
-
-        return res.status(202).json({
-
-            sucesso: true,
-
-            mensagem:
-                "Processo de backup iniciado.",
-
-            job: {
-
-                id:
-                    job.id,
-
-                status:
-                    job.status,
-
-                etapa:
-                    job.etapa,
-
-                progresso:
-                    job.progresso,
-
-                mensagem:
-                    job.mensagem
+                });
 
             }
 
-        });
+
+            // ============================================
+            // VALIDAR BANCO DE DESTINO
+            // ============================================
+
+            if (
+                !host ||
+                !port ||
+                !database ||
+                !user ||
+                !password
+            ) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "host, port, database, user e password são obrigatórios."
+
+                });
+
+            }
 
 
-    } catch (erro) {
+            // ============================================
+            // VALIDAR CONFIGURAÇÃO
+            // ============================================
 
-        console.error(
-            "Erro ao iniciar backup:",
-            erro.message
-        );
+            const configBanco =
+                validarConfig({
+
+                    host,
+                    port,
+                    database,
+                    user,
+                    password
+
+                });
 
 
-        return res.status(500).json({
+            // ============================================
+            // CRIAR POOL DO BANCO ATUAL
+            // ============================================
 
-            sucesso: false,
+            if (!conexaoAtiva) {
 
-            mensagem:
-                "Não foi possível iniciar o backup."
+                return res.status(400).json({
 
-        });
+                    sucesso: false,
+
+                    mensagem:
+                        "Nenhum banco de dados está conectado."
+
+                });
+
+            }
+
+
+            bancoPool =
+                criarPool(
+                    conexaoAtiva
+                );
+
+
+            // ============================================
+            // RESTAURAR
+            // ============================================
+
+            const resultado =
+                await restaurarBackup(
+
+                    execucaoId,
+
+                    configBanco,
+
+                    bancoPool
+
+                );
+
+
+            // ============================================
+            // RESPOSTA
+            // ============================================
+
+            return res.json(
+                resultado
+            );
+
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao restaurar backup:",
+                erro
+            );
+
+
+            return res.status(500).json({
+
+                sucesso: false,
+
+                mensagem:
+                    erro.message
+
+            });
+
+
+        } finally {
+
+            if (bancoPool) {
+
+                await bancoPool.end();
+
+            }
+
+        }
 
     }
-
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| CONSULTAR STATUS DO BACKUP
-|--------------------------------------------------------------------------
-*/
-
-// ======================================================
-// CONSULTAR STATUS DO BACKUP
-// ======================================================
+);
 
 app.get(
-    "/api/backup/:id",
+    "/api/backup/status/:jobId",
     (req, res) => {
 
         try {
 
+            const jobId =
+                req.params.jobId;
+
             const job =
                 obterJob(
-                    req.params.id
+                    jobId
                 );
 
 
@@ -363,10 +491,11 @@ app.get(
 
                 return res.status(404).json({
 
-                    sucesso: false,
+                    sucesso:
+                        false,
 
                     mensagem:
-                        "Job de backup não encontrado."
+                        "Processo de backup não encontrado."
 
                 });
 
@@ -375,27 +504,28 @@ app.get(
 
             res.json({
 
-                sucesso: true,
+                sucesso:
+                    true,
 
                 job
 
             });
 
-
         } catch (erro) {
 
             console.error(
-                "Erro ao consultar job:",
+                "Erro ao consultar status:",
                 erro
             );
 
 
             res.status(500).json({
 
-                sucesso: false,
+                sucesso:
+                    false,
 
                 mensagem:
-                    "Erro ao consultar o processo de backup."
+                    erro.message
 
             });
 
@@ -404,137 +534,527 @@ app.get(
     }
 );
 
-app.get("/api/backup/status/:id", (req, res) => {
+// ======================================================
+// STATUS
+// ======================================================
 
-    try {
+app.post(
+    "/api/backup",
+    async (req, res) => {
 
-        const id =
-            req.params.id;
+        try {
+
+            console.log(
+                "======================================"
+            );
+
+            console.log(
+                "CONFIGURAÇÃO RECEBIDA NO BACKUP:"
+            );
+
+            console.log(
+                JSON.stringify(
+                    req.body,
+                    null,
+                    2
+                )
+            );
+
+            console.log(
+                "======================================"
+            );
 
 
-        const job =
-            obterJob(id);
+            // ==================================================
+            // CONFIGURAÇÃO DO BANCO
+            // ==================================================
+
+            const conexaoRecebida =
+                req.body.conexaoBanco ||
+                req.body.configuracaoBanco ||
+                req.body.banco ||
+                req.body;
 
 
-        if (!job) {
+            const host =
+                conexaoRecebida.host;
 
-            return res.status(404).json({
+            const port =
+                conexaoRecebida.port;
+
+            const database =
+                conexaoRecebida.database;
+
+            const user =
+                conexaoRecebida.user;
+
+            const password =
+                conexaoRecebida.password;
+
+
+            // ==================================================
+            // DEMAIS CONFIGURAÇÕES
+            // ==================================================
+
+            const diretorioPrincipal =
+                req.body.diretorioPrincipal;
+
+            const diretorioSecundario =
+                req.body.diretorioSecundario;
+
+            const criptografar =
+                req.body.criptografar === true;
+
+            const compactar =
+                req.body.compactar === true;
+
+            const quantidade =
+                Number(
+                    req.body.quantidade
+                );
+
+            const forcarManutencao =
+                req.body.forcarManutencao === true;
+
+
+            // ==================================================
+            // DEBUG
+            // ==================================================
+
+            console.log(
+                "CONFIGURAÇÃO DO BANCO EXTRAÍDA:"
+            );
+
+            console.log({
+                host,
+                port,
+                database,
+                user,
+                password:
+                    password
+                        ? "********"
+                        : undefined
+            });
+
+
+            // ==================================================
+            // VALIDAR CONFIGURAÇÃO
+            // ==================================================
+
+            const conexao =
+                validarConfig({
+                    host,
+                    port,
+                    database,
+                    user,
+                    password
+                });
+
+
+            // ==================================================
+            // VALIDAR DIRETÓRIO PRINCIPAL
+            // ==================================================
+
+            if (
+                !diretorioPrincipal ||
+                typeof diretorioPrincipal !== "string"
+            ) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "O diretório principal é obrigatório."
+
+                });
+
+            }
+
+
+            // ==================================================
+            // VALIDAR RETENÇÃO
+            // ==================================================
+
+            if (
+                !Number.isInteger(
+                    quantidade
+                ) ||
+                quantidade < 1
+            ) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "A quantidade de backups deve ser um número inteiro maior que zero."
+
+                });
+
+            }
+
+
+            // ==================================================
+            // SALVAR CONEXÃO ATIVA
+            // ==================================================
+
+            conexaoAtiva =
+                conexao;
+
+
+            // ==================================================
+            // CRIAR JOB
+            // ==================================================
+
+            const job =
+                iniciarBackup({
+
+                    conexaoBanco:
+                        conexao,
+
+                    bancoDados:
+                        database,
+
+                    diretorioPrincipal,
+
+                    destinoSecundario:
+                        diretorioSecundario ||
+                        null,
+
+                    criptografar,
+
+                    compactar,
+
+                    quantidadeRetencao:
+                        quantidade,
+
+                    forcarManutencao
+
+                });
+
+
+            // ==================================================
+            // RESPOSTA
+            // ==================================================
+
+            return res.status(202).json({
+
+                sucesso: true,
+
+                jobId:
+                    job.id,
+
+                mensagem:
+                    "Backup iniciado com sucesso."
+
+            });
+
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao iniciar backup:"
+            );
+
+            console.error(
+                erro
+            );
+
+
+            return res.status(500).json({
 
                 sucesso: false,
 
                 mensagem:
-                    "Processo de backup não encontrado."
+                    erro.message
 
             });
 
         }
 
-
-        return res.json({
-
-            sucesso: true,
-
-            job
-
-        });
-
-    } catch (erro) {
-
-        console.error(
-            "Erro ao consultar status:",
-            erro.message
-        );
+    }
+);
 
 
-        return res.status(500).json({
+// ======================================================
+// HISTÓRICO
+// ======================================================
 
-            sucesso: false,
+// ======================================================
+// HISTÓRICO
+// ======================================================
 
-            mensagem:
-                "Erro ao consultar o processo de backup."
+app.get(
+    "/api/historico",
+    async (req, res) => {
 
-        });
+        let bancoPool = null;
+
+        try {
+
+            if (!conexaoAtiva) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "Nenhum banco de dados está conectado."
+
+                });
+
+            }
+
+
+            // Cria um pool usando a conexão atualmente configurada
+            bancoPool =
+                criarPool(
+                    conexaoAtiva
+                );
+
+
+            const historico =
+                await buscarHistorico(
+                    bancoPool
+                );
+
+
+            return res.json({
+
+                sucesso: true,
+
+                historico
+
+            });
+
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao buscar histórico:",
+                erro
+            );
+
+
+            return res.status(500).json({
+
+                sucesso: false,
+
+                mensagem:
+                    erro.message
+
+            });
+
+
+        } finally {
+
+            if (bancoPool) {
+
+                await bancoPool.end();
+
+            }
+
+        }
 
     }
+);
 
-});
+
+// ======================================================
+// LOG
+// ======================================================
+
+app.get(
+    "/api/historico/:id/logs",
+    async (req, res) => {
+
+        let bancoPool = null;
+
+        try {
+
+            if (!conexaoAtiva) {
+
+                return res.status(400).json({
+
+                    sucesso: false,
+
+                    mensagem:
+                        "Nenhum banco de dados está conectado."
+
+                });
+
+            }
 
 
-/*
-|--------------------------------------------------------------------------
-| HISTÓRICO DE EXECUÇÕES
-|--------------------------------------------------------------------------
-*/
+            bancoPool =
+                criarPool(
+                    conexaoAtiva
+                );
 
-app.get("/api/backup/historico", async (req, res) => {
+
+            const logs =
+                await buscarLogs(
+                    req.params.id,
+                    bancoPool
+                );
+
+
+            return res.json({
+
+                sucesso: true,
+
+                logs
+
+            });
+
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao buscar logs:",
+                erro
+            );
+
+
+            return res.status(500).json({
+
+                sucesso: false,
+
+                mensagem:
+                    erro.message
+
+            });
+
+
+        } finally {
+
+            if (bancoPool) {
+
+                await bancoPool.end();
+
+            }
+
+        }
+
+    }
+);
+
+
+// ======================================================
+// TESTE DE RETENÇÃO
+// ======================================================
+
+app.post(
+    "/api/backup/teste-retencao",
+    (
+        req,
+        res
+    ) => {
+
+        try {
+
+            const resultado =
+                aplicarRetencao(
+
+                    path.join(
+                        __dirname,
+                        "..",
+                        "backups"
+                    ),
+
+                    req.body.quantidade
+
+                );
+
+
+            res.json({
+
+                sucesso:
+                    true,
+
+                resultado
+
+            });
+
+        } catch (erro) {
+
+            res.status(500).json({
+
+                sucesso:
+                    false,
+
+                mensagem:
+                    erro.message
+
+            });
+
+        }
+
+    }
+);
+
+
+// ======================================================
+// SERVIDOR
+// ======================================================
+
+const PORT =
+    3000;
+
+
+app.listen(
+    PORT,
+    () => {
+
+        console.log(
+            `Servidor rodando na porta ${PORT}`
+        );
+
+    }
+);
+
+// ======================================================
+// ENCERRAMENTO DO SERVIDOR
+// ======================================================
+
+async function encerrarServidor() {
+
+    console.log(
+        "\nEncerrando servidor..."
+    );
+
 
     try {
 
-        const resultado =
-            await pool.query(`
+        await fecharPool();
 
-                SELECT
-                    id,
-                    data_hora,
-                    regra_aplicada,
-                    duracao,
-                    status,
-                    tipo_operacao,
-                    data_inicio,
-                    data_fim,
-                    mensagem,
-                    banco_dados
-
-                FROM historico_manutencao
-
-                ORDER BY data_hora DESC
-
-                LIMIT 50
-
-            `);
-
-
-        return res.json({
-
-            sucesso: true,
-
-            historico:
-                resultado.rows
-
-        });
+        console.log(
+            "Pool do banco encerrado."
+        );
 
     } catch (erro) {
 
         console.error(
-            "Erro ao buscar histórico:",
+            "Erro ao fechar pool:",
             erro.message
         );
 
-
-        return res.status(500).json({
-
-            sucesso: false,
-
-            mensagem:
-                "Não foi possível carregar o histórico."
-
-        });
-
     }
 
-});
+
+    process.exit(0);
+
+}
 
 
-/*
-|--------------------------------------------------------------------------
-| INICIAR SERVIDOR
-|--------------------------------------------------------------------------
-*/
+process.on(
+    "SIGINT",
+    encerrarServidor
+);
 
-app.listen(PORT, () => {
 
-    console.log(
-        `Servidor rodando na porta ${PORT}`
-    );
-
-});
+process.on(
+    "SIGTERM",
+    encerrarServidor
+);

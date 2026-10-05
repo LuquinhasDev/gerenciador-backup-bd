@@ -1,1031 +1,233 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Gerenciador de Backup</title>
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backup Manager</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-    <div class="app">
-
-        <!-- ================================================= -->
-        <!-- SIDEBAR -->
-        <!-- ================================================= -->
-
-        <aside class="sidebar">
-
-            <div class="brand">
-
-                <div class="brand-icon">
-                    B
-                </div>
-
-                <div>
-                    <strong>Backup Manager</strong>
-                    <span>Plataforma de gerenciamento</span>
-                </div>
-
-            </div>
-
-
-            <nav class="navigation">
-
-                <button
-                    class="nav-item active"
-                    data-section="configuracao"
-                >
-                    <span>⚙</span>
-                    Configuração
-                </button>
-
-                <button
-                    class="nav-item"
-                    data-section="processo"
-                >
-                    <span>◉</span>
-                    Processo
-                </button>
-
-                <button
-                    class="nav-item"
-                    data-section="historico"
-                >
-                    <span>▤</span>
-                    Histórico
-                </button>
-
-            </nav>
-
-
-            <div class="sidebar-footer">
-
-                <div class="connection-indicator">
-
-                    <span
-                        id="sidebarConnectionDot"
-                        class="status-dot offline"
-                    ></span>
-
-                    <div>
-                        <strong id="sidebarConnectionText">
-                            Não conectado
-                        </strong>
-
-                        <small>
-                            Banco de dados
-                        </small>
-                    </div>
-
-                </div>
-
-            </div>
-
-        </aside>
-
-
-        <!-- ================================================= -->
-        <!-- CONTEÚDO -->
-        <!-- ================================================= -->
-
-        <main class="main">
-
-            <!-- HEADER -->
-
-            <header class="topbar">
-
-                <div>
-
-                    <h1 id="pageTitle">
-                        Configuração
-                    </h1>
-
-                    <p id="pageDescription">
-                        Configure a conexão e os parâmetros do processo de backup.
-                    </p>
-
-                </div>
-
-                <div class="system-status">
-
-                    <span
-                        id="systemStatusDot"
-                        class="status-dot offline"
-                    ></span>
-
-                    <span id="systemStatusText">
-                        Sistema pronto
-                    </span>
-
-                </div>
-
-            </header>
-
-
-            <!-- ================================================= -->
-            <!-- SEÇÃO CONFIGURAÇÃO -->
-            <!-- ================================================= -->
-
-            <section
-                id="configuracao"
-                class="page-section active-section"
-            >
-
-                <div class="grid-layout">
-
-                    <!-- CONEXÃO -->
-
-                    <div class="panel">
-
-                        <div class="panel-header">
-
-                            <div>
-
-                                <h2>Conexão com o banco</h2>
-
-                                <p>
-                                    Informe os parâmetros utilizados para acessar o banco de dados.
-                                </p>
-
-                            </div>
-
-                            <span class="panel-number">
-                                01
-                            </span>
-
-                        </div>
-
-
-                        <div class="form-grid">
-
-                            <div class="form-group">
-
-                                <label for="dbHost">
-                                    Host
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="dbHost"
-                                    value="localhost"
-                                    autocomplete="off"
-                                >
-
-                            </div>
-
-
-                            <div class="form-group">
-
-                                <label for="dbPort">
-                                    Porta
-                                </label>
-
-                                <input
-                                    type="number"
-                                    id="dbPort"
-                                    value="5432"
-                                    min="1"
-                                    max="65535"
-                                >
-
-                            </div>
-
-
-                            <div class="form-group">
-
-                                <label for="database">
-                                    Banco de dados
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="database"
-                                    value="gestao_veiculos"
-                                    autocomplete="off"
-                                >
-
-                            </div>
-
-
-                            <div class="form-group">
-
-                                <label for="dbUser">
-                                    Usuário
-                                </label>
-
-                                <input
-                                    type="text"
-                                    id="dbUser"
-                                    value="postgres"
-                                    autocomplete="off"
-                                >
-
-                            </div>
-
-
-                            <div class="form-group full-width">
-
-                                <label for="dbPassword">
-                                    Senha
-                                </label>
-
-                                <div class="password-input">
-
-                                    <input
-                                        type="password"
-                                        id="dbPassword"
-                                        placeholder="Senha do banco"
-                                        autocomplete="new-password"
-                                    >
-
-                                    <button
-                                        type="button"
-                                        id="togglePassword"
-                                        class="icon-button"
-                                    >
-                                        Mostrar
-                                    </button>
-
-                                </div>
-
-                                <small class="field-info">
-                                    A senha não será exibida em logs.
-                                </small>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="panel-actions">
-
-                            <button
-                                type="button"
-                                id="testConnection"
-                                class="secondary-button"
-                            >
-                                Testar conexão
-                            </button>
-
-                            <div
-                                id="connectionStatus"
-                                class="inline-status"
-                            ></div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- DESTINOS -->
-
-                    <div class="panel">
-
-                        <div class="panel-header">
-
-                            <div>
-
-                                <h2>Destino do backup</h2>
-
-                                <p>
-                                    Defina onde os arquivos gerados serão armazenados.
-                                </p>
-
-                            </div>
-
-                            <span class="panel-number">
-                                02
-                            </span>
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label for="mainPath">
-                                Diretório principal
-                            </label>
-
-                            <input
-                                type="text"
-                                id="mainPath"
-                                placeholder="C:\backups\principal"
-                            >
-
-                            <small class="field-info">
-                                Diretório obrigatório para armazenamento do backup.
-                            </small>
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label for="secondaryPath">
-                                Diretório secundário
-                                <span class="optional">
-                                    Opcional
-                                </span>
-                            </label>
-
-                            <input
-                                type="text"
-                                id="secondaryPath"
-                                placeholder="D:\backups\copia"
-                            >
-
-                            <small class="field-info">
-                                Uma cópia adicional poderá ser criada neste diretório.
-                            </small>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- MANUTENÇÃO -->
-
-                    <div class="panel">
-
-                        <div class="panel-header">
-
-                            <div>
-
-                                <h2>Manutenção</h2>
-
-                                <p>
-                                    Configure as regras utilizadas antes da execução.
-                                </p>
-
-                            </div>
-
-                            <span class="panel-number">
-                                03
-                            </span>
-
-                        </div>
-
-
-                        <label class="switch-row">
-
-                            <div>
-
-                                <strong>
-                                    Forçar manutenção completa
-                                </strong>
-
-                                <span>
-                                    Ignora a decisão automática de manutenção.
-                                </span>
-
-                            </div>
-
-                            <input
-                                type="checkbox"
-                                id="forceMaintenance"
-                            >
-
-                            <span class="switch"></span>
-
-                        </label>
-
-
-                        <div class="form-group retention-group">
-
-                            <label for="retention">
-                                Backups a manter
-                            </label>
-
-                            <input
-                                type="number"
-                                id="retention"
-                                value="5"
-                                min="1"
-                            >
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- SEGURANÇA -->
-
-                    <div class="panel">
-
-                        <div class="panel-header">
-
-                            <div>
-
-                                <h2>Segurança</h2>
-
-                                <p>
-                                    Defina os mecanismos de proteção do arquivo.
-                                </p>
-
-                            </div>
-
-                            <span class="panel-number">
-                                04
-                            </span>
-
-                        </div>
-
-
-                        <label class="switch-row">
-
-                            <div>
-
-                                <strong>
-                                    Criptografia AES
-                                </strong>
-
-                                <span>
-                                    Protege o conteúdo do backup.
-                                </span>
-
-                            </div>
-
-                            <input
-                                type="checkbox"
-                                id="encrypt"
-                            >
-
-                            <span class="switch"></span>
-
-                        </label>
-
-
-                        <label class="switch-row">
-
-                            <div>
-
-                                <strong>
-                                    Compactação ZIP
-                                </strong>
-
-                                <span>
-                                    Reduz o tamanho do arquivo gerado.
-                                </span>
-
-                            </div>
-
-                            <input
-                                type="checkbox"
-                                id="compress"
-                            >
-
-                            <span class="switch"></span>
-
-                        </label>
-
-                    </div>
-
-                </div>
-
-
-                <!-- AÇÃO -->
-
-                <div class="start-area">
-
-                    <div>
-
-                        <strong>
-                            Tudo pronto para executar?
-                        </strong>
-
-                        <span>
-                            Verifique a configuração antes de iniciar o processo.
-                        </span>
-
-                    </div>
-
-                    <button
-                        type="button"
-                        id="startBackup"
-                        class="primary-button"
-                    >
-                        Iniciar backup
-                    </button>
-
-                </div>
-
-
-                <!-- MENSAGEM -->
-
-                <div
-                    id="message"
-                    class="message hidden"
-                ></div>
-
-            </section>
-
-
-            <!-- ================================================= -->
-            <!-- SEÇÃO PROCESSO -->
-            <!-- ================================================= -->
-
-            <section
-                id="processo"
-                class="page-section"
-            >
-
-                <div class="panel process-panel">
-
-                    <div class="panel-header">
-
-                        <div>
-
-                            <h2>Processo de backup</h2>
-
-                            <p>
-                                Acompanhe cada etapa da execução.
-                            </p>
-
-                        </div>
-
-                        <span
-                            id="processStatusBadge"
-                            class="badge neutral"
-                        >
-                            Aguardando
-                        </span>
-
-                    </div>
-
-
-                    <!-- PROGRESSO -->
-
-                    <div class="progress-container">
-
-                        <div class="progress-header">
-
-                            <span id="progressText">
-                                Aguardando execução
-                            </span>
-
-                            <strong id="progressPercent">
-                                0%
-                            </strong>
-
-                        </div>
-
-                        <div class="progress-bar">
-
-                            <div
-                                id="progressBar"
-                                class="progress-value"
-                                style="width: 0%"
-                            ></div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- ETAPAS -->
-
-                    <div class="process-steps">
-
-                        <div
-                            class="process-step"
-                            data-step="connection"
-                        >
-
-                            <div class="step-icon">
-                                1
-                            </div>
-
-                            <div class="step-content">
-
-                                <strong>
-                                    Verificação da conexão
-                                </strong>
-
-                                <span class="step-status">
-                                    Aguardando
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="process-step"
-                            data-step="maintenance"
-                        >
-
-                            <div class="step-icon">
-                                2
-                            </div>
-
-                            <div class="step-content">
-
-                                <strong>
-                                    Verificação de manutenção
-                                </strong>
-
-                                <span class="step-status">
-                                    Aguardando
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="process-step"
-                            data-step="backup"
-                        >
-
-                            <div class="step-icon">
-                                3
-                            </div>
-
-                            <div class="step-content">
-
-                                <strong>
-                                    Criação do backup
-                                </strong>
-
-                                <span class="step-status">
-                                    Aguardando
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="process-step"
-                            data-step="security"
-                        >
-
-                            <div class="step-icon">
-                                4
-                            </div>
-
-                            <div class="step-content">
-
-                                <strong>
-                                    Segurança e compactação
-                                </strong>
-
-                                <span class="step-status">
-                                    Aguardando
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="process-step"
-                            data-step="copy"
-                        >
-
-                            <div class="step-icon">
-                                5
-                            </div>
-
-                            <div class="step-content">
-
-                                <strong>
-                                    Cópia para os destinos
-                                </strong>
-
-                                <span class="step-status">
-                                    Aguardando
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="process-step"
-                            data-step="retention"
-                        >
-
-                            <div class="step-icon">
-                                6
-                            </div>
-
-                            <div class="step-content">
-
-                                <strong>
-                                    Aplicação da retenção
-                                </strong>
-
-                                <span class="step-status">
-                                    Aguardando
-                                </span>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- LOG -->
-
-                <div class="panel">
-
-                    <div class="panel-header">
-
-                        <div>
-
-                            <h2>Log da execução</h2>
-
-                            <p>
-                                Informações sobre a operação atual.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                    <div
-                        id="liveLog"
-                        class="log-box"
-                    >
-
-                        <div class="log-line">
-                            <span class="log-time">
-                                --:--:--
-                            </span>
-
-                            <span>
-                                Aguardando início da execução.
-                            </span>
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-            <!-- ================================================= -->
-            <!-- SEÇÃO HISTÓRICO -->
-            <!-- ================================================= -->
-
-            <section
-                id="historico"
-                class="page-section"
-            >
-
-                <div class="panel">
-
-                    <div class="panel-header">
-
-                        <div>
-
-                            <h2>Histórico de execuções</h2>
-
-                            <p>
-                                Consulte as operações realizadas pela plataforma.
-                            </p>
-
-                        </div>
-
-                        <button
-                            type="button"
-                            id="refreshHistory"
-                            class="secondary-button"
-                        >
-                            Atualizar
-                        </button>
-
-                    </div>
-
-
-                    <div class="table-container">
-
-                        <table>
-
-                            <thead>
-
-                                <tr>
-
-                                    <th>
-                                        Data
-                                    </th>
-
-                                    <th>
-                                        Duração
-                                    </th>
-
-                                    <th>
-                                        Manutenção
-                                    </th>
-
-                                    <th>
-                                        Operação
-                                    </th>
-
-                                    <th>
-                                        Resultado
-                                    </th>
-
-                                    <th>
-                                        Log
-                                    </th>
-
-                                </tr>
-
-                            </thead>
-
-
-                            <tbody id="historyTable">
-
-                                <tr class="empty-row">
-
-                                    <td colspan="6">
-
-                                        Nenhuma execução registrada.
-
-                                    </td>
-
-                                </tr>
-
-                            </tbody>
-
-                        </table>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-        </main>
-
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">B</div>
+      <div>
+        <strong>Backup Manager</strong>
+        <span>Gerenciamento de banco</span>
+      </div>
     </div>
 
+    <nav class="nav">
+      <button class="nav-item active" data-section="configuracao"><span>⚙</span> Configuração</button>
+      <button class="nav-item" data-section="processo"><span>▶</span> Processo</button>
+      <button class="nav-item" data-section="historico"><span>▤</span> Histórico</button>
+    </nav>
 
-    <!-- ===================================================== -->
-    <!-- MODAL DE CONFIRMAÇÃO -->
-    <!-- ===================================================== -->
-
-    <div
-        id="confirmationModal"
-        class="modal-overlay hidden"
-    >
-
-        <div class="modal">
-
-            <div class="modal-icon">
-                !
-            </div>
-
-            <h2>
-                Confirmar operação
-            </h2>
-
-            <p>
-                Um novo processo de backup será iniciado.
-                A operação poderá levar alguns minutos.
-            </p>
-
-
-            <div class="confirmation-details">
-
-                <div>
-
-                    <span>
-                        Banco
-                    </span>
-
-                    <strong id="confirmDatabase">
-                        -
-                    </strong>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        Destino
-                    </span>
-
-                    <strong id="confirmDestination">
-                        -
-                    </strong>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        Retenção
-                    </span>
-
-                    <strong id="confirmRetention">
-                        -
-                    </strong>
-
-                </div>
-
-            </div>
-
-
-            <div class="modal-actions">
-
-                <button
-                    type="button"
-                    id="cancelBackup"
-                    class="secondary-button"
-                >
-                    Cancelar
-                </button>
-
-                <button
-                    type="button"
-                    id="confirmBackup"
-                    class="primary-button"
-                >
-                    Confirmar e iniciar
-                </button>
-
-            </div>
-
+    <div class="sidebar-bottom">
+      <div class="connection-card">
+        <span id="sideDot" class="dot offline"></span>
+        <div>
+          <strong id="sideConnection">Não conectado</strong>
+          <small>PostgreSQL</small>
         </div>
-
+      </div>
+      <div class="version">Backup Manager · Projeto acadêmico</div>
     </div>
+  </aside>
 
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PLATAFORMA DE GERENCIAMENTO</p>
+        <h1 id="pageTitle">Configuração</h1>
+        <p id="pageDescription">Configure a conexão e os parâmetros do processo.</p>
+      </div>
+      <div class="top-status">
+        <span id="topDot" class="dot offline"></span>
+        <span id="topConnection">Banco desconectado</span>
+      </div>
+    </header>
 
-    <!-- ===================================================== -->
-    <!-- MODAL DE LOG -->
-    <!-- ===================================================== -->
+    <div id="globalMessage" class="message hidden"></div>
 
-    <div
-        id="logModal"
-        class="modal-overlay hidden"
-    >
-
-        <div class="modal log-modal">
-
-            <div class="modal-header">
-
-                <div>
-
-                    <h2>
-                        Detalhes da execução
-                    </h2>
-
-                    <p>
-                        Informações registradas pela plataforma.
-                    </p>
-
-                </div>
-
-                <button
-                    type="button"
-                    id="closeLogModal"
-                    class="close-button"
-                >
-                    ×
-                </button>
-
-            </div>
-
-
-            <div
-                id="logDetails"
-                class="log-details"
-            >
-
-                Nenhum detalhe disponível.
-
-            </div>
-
+    <!-- CONFIGURAÇÃO -->
+    <section id="configuracao" class="section active-section">
+      <div class="hero-card">
+        <div>
+          <span class="hero-kicker">CONTROLE CENTRAL</span>
+          <h2>Prepare uma execução segura</h2>
+          <p>Configure o banco, os destinos e as políticas de manutenção, segurança e retenção antes de iniciar.</p>
         </div>
+        <div class="hero-icon">↗</div>
+      </div>
 
+      <div class="grid-2">
+        <article class="card">
+          <div class="card-heading">
+            <div><span class="step-number">01</span><h3>Conexão com o banco</h3><p>Credenciais utilizadas pelo processo.</p></div>
+            <span class="mini-badge">PostgreSQL</span>
+          </div>
+          <div class="form-grid">
+            <label>Host<input id="dbHost" value="localhost" autocomplete="off"></label>
+            <label>Porta<input id="dbPort" type="number" value="5432" min="1" max="65535"></label>
+            <label class="full">Banco de dados<input id="database" value="gestao_veiculos" autocomplete="off"></label>
+            <label>Usuário<input id="dbUser" value="postgres" autocomplete="off"></label>
+            <label>Senha
+              <div class="password-wrap"><input id="dbPassword" type="password" placeholder="Senha do banco"><button type="button" id="togglePassword">Mostrar</button></div>
+            </label>
+          </div>
+          <div class="card-actions">
+            <button id="testConnection" class="btn secondary">Testar conexão</button>
+            <span id="connectionStatus" class="inline-status">Aguardando teste</span>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-heading">
+            <div><span class="step-number">02</span><h3>Destino do backup</h3><p>Onde os arquivos serão gravados.</p></div>
+            <span class="mini-badge">Obrigatório</span>
+          </div>
+          <label>Diretório principal<input id="mainPath" placeholder="C:\backups\principal"></label>
+          <label>Diretório secundário <em>opcional</em><input id="secondaryPath" placeholder="D:\backups\copia"></label>
+          <div class="hint">O segundo diretório recebe uma cópia adicional quando informado.</div>
+        </article>
+
+        <article class="card">
+          <div class="card-heading">
+            <div><span class="step-number">03</span><h3>Manutenção e retenção</h3><p>Regras executadas antes e depois do backup.</p></div>
+          </div>
+          <div class="toggle-row">
+            <div><strong>Forçar manutenção</strong><span>Ignora a decisão automática de manutenção.</span></div>
+            <label class="switch"><input id="forceMaintenance" type="checkbox"><span></span></label>
+          </div>
+          <label>Quantidade de backups a manter<input id="retention" type="number" value="5" min="1"></label>
+        </article>
+
+        <article class="card">
+          <div class="card-heading">
+            <div><span class="step-number">04</span><h3>Segurança e compactação</h3><p>Proteção e redução do arquivo final.</p></div>
+          </div>
+          <div class="toggle-row">
+            <div><strong>Criptografia AES</strong><span>Protege o conteúdo do backup.</span></div>
+            <label class="switch"><input id="encrypt" type="checkbox"><span></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><strong>Compactação ZIP</strong><span>Reduz o tamanho do arquivo gerado.</span></div>
+            <label class="switch"><input id="compress" type="checkbox"><span></span></label>
+          </div>
+        </article>
+      </div>
+
+      <div class="launch-card">
+        <div>
+          <span class="hero-kicker">EXECUÇÃO</span>
+          <h3>Pronto para iniciar?</h3>
+          <p>O processo será executado em segundo plano e poderá ser acompanhado pela tela Processo.</p>
+        </div>
+        <button id="startBackup" class="btn primary">Iniciar backup <span>→</span></button>
+      </div>
+    </section>
+
+    <!-- PROCESSO -->
+    <section id="processo" class="section">
+      <div class="process-head">
+        <div><span class="hero-kicker">MONITORAMENTO</span><h2>Processo de backup</h2><p>Acompanhe cada etapa sem bloquear a interface.</p></div>
+        <span id="processStatusBadge" class="status-badge idle">Aguardando</span>
+      </div>
+
+      <div class="progress-card">
+        <div class="progress-meta"><span id="progressText">Aguardando execução</span><strong id="progressPercent">0%</strong></div>
+        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+        <div id="jobIdLabel" class="job-id">Nenhum processo em execução.</div>
+      </div>
+
+      <div class="process-grid">
+        <article class="card">
+          <div class="card-heading"><div><h3>Etapas da execução</h3><p>Estado atual de cada operação.</p></div></div>
+          <div id="steps" class="steps">
+            <div class="process-step" data-step="connection"><span>1</span><div><strong>Verificação da conexão</strong><small>Aguardando</small></div></div>
+            <div class="process-step" data-step="maintenance"><span>2</span><div><strong>Verificação de manutenção</strong><small>Aguardando</small></div></div>
+            <div class="process-step" data-step="backup"><span>3</span><div><strong>Criação do backup</strong><small>Aguardando</small></div></div>
+            <div class="process-step" data-step="security"><span>4</span><div><strong>Segurança e compactação</strong><small>Aguardando</small></div></div>
+            <div class="process-step" data-step="copy"><span>5</span><div><strong>Cópia para os destinos</strong><small>Aguardando</small></div></div>
+            <div class="process-step" data-step="retention"><span>6</span><div><strong>Aplicação da retenção</strong><small>Aguardando</small></div></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-heading"><div><h3>Log em tempo real</h3><p>Eventos da execução atual.</p></div><span class="live-dot">● LIVE</span></div>
+          <div id="liveLog" class="terminal"><div>Aguardando início da execução...</div></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- HISTÓRICO -->
+    <section id="historico" class="section">
+      <div class="process-head">
+        <div><span class="hero-kicker">AUDITORIA</span><h2>Histórico de execuções</h2><p>Consulte resultado, manutenção, logs e restauração.</p></div>
+        <button id="refreshHistory" class="btn secondary">↻ Atualizar</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat"><span>Execuções</span><strong id="statTotal">—</strong></div>
+        <div class="stat"><span>Sucessos</span><strong id="statSuccess">—</strong></div>
+        <div class="stat"><span>Falhas</span><strong id="statFail">—</strong></div>
+      </div>
+      <div class="card table-card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th>Banco</th><th>Operação</th><th>Manutenção</th><th>Duração</th><th>Resultado</th><th>Ações</th></tr></thead>
+            <tbody id="historyTable"><tr><td colspan="7" class="empty">Carregando histórico...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Modal de confirmação -->
+<div id="confirmationModal" class="modal-overlay hidden">
+  <div class="modal small-modal">
+    <button class="modal-close" data-close="confirmationModal">×</button>
+    <div class="modal-symbol">!</div>
+    <h2>Confirmar backup</h2>
+    <p>O processo poderá executar manutenção e operações demoradas em segundo plano.</p>
+    <div id="confirmationDetails" class="detail-list"></div>
+    <div class="modal-actions"><button class="btn secondary" data-close="confirmationModal">Cancelar</button><button id="confirmBackup" class="btn primary">Confirmar e iniciar</button></div>
+  </div>
+</div>
+
+<!-- Modal de log -->
+<div id="logModal" class="modal-overlay hidden">
+  <div class="modal wide-modal">
+    <button class="modal-close" data-close="logModal">×</button>
+    <span class="hero-kicker">AUDITORIA</span><h2>Log da execução</h2><p>Eventos registrados pelo backend.</p>
+    <div id="logDetails" class="log-modal-content">Carregando...</div>
+  </div>
+</div>
+
+<!-- Modal de restauração -->
+<div id="restoreModal" class="modal-overlay hidden">
+  <div class="modal wide-modal">
+    <button class="modal-close" data-close="restoreModal">×</button>
+    <span class="hero-kicker">RECUPERAÇÃO</span><h2>Restaurar backup</h2>
+    <p>Escolha o banco de destino. Objetos existentes podem ser substituídos.</p>
+    <div class="restore-summary">
+      <div><span>Execução</span><strong id="restoreExecutionId">—</strong></div>
+      <div><span>Arquivo</span><strong id="restoreBackupFile">—</strong></div>
+      <div><span>Proteção</span><strong id="restoreBackupProtection">—</strong></div>
     </div>
+    <div class="form-grid">
+      <label>Host<input id="restoreHost"></label>
+      <label>Porta<input id="restorePort" type="number" value="5432"></label>
+      <label class="full">Banco de destino<input id="restoreDatabase"></label>
+      <label>Usuário<input id="restoreUser"></label>
+      <label>Senha<input id="restorePassword" type="password"></label>
+    </div>
+    <div id="restoreStatus" class="message hidden"></div>
+    <div class="modal-actions"><button class="btn secondary" data-close="restoreModal">Cancelar</button><button id="confirmRestore" class="btn primary">Restaurar backup</button></div>
+  </div>
+</div>
 
-
-    <script src="script.js"></script>
-
+<script src="script.js"></script>
 </body>
-
 </html>

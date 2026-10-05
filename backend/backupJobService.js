@@ -1,5 +1,14 @@
-const crypto = require("crypto");
-const fs = require("fs");
+const crypto =
+    require("crypto");
+
+const fs =
+    require("fs");
+
+const {
+    criarPool,
+    validarConfig
+} = require("./database");
+
 
 const {
     buscarUltimaManutencao,
@@ -8,15 +17,19 @@ const {
     registrarManutencao
 } = require("./maintenanceService");
 
+
 const {
     criarBackup,
     registrarBackup
 } = require("./backupService");
 
+
 const {
     criptografarAES,
-    compactarZIP
+    compactarZIP,
+    protegerSegredo
 } = require("./securityService");
+
 
 const {
     aplicarRetencao,
@@ -24,7 +37,15 @@ const {
 } = require("./fileService");
 
 
-const jobs = new Map();
+const {
+    criarExecucao,
+    registrarLog,
+    finalizarExecucao
+} = require("./logService");
+
+
+const jobs =
+    new Map();
 
 
 // ======================================================
@@ -36,15 +57,19 @@ function criarJob() {
     const id =
         crypto.randomUUID();
 
+
     const job = {
 
         id,
 
-        status: "INICIANDO",
+        status:
+            "INICIANDO",
 
-        etapa: "INICIANDO",
+        etapa:
+            "INICIANDO",
 
-        progresso: 0,
+        progresso:
+            0,
 
         mensagem:
             "Preparando processo de backup...",
@@ -52,13 +77,17 @@ function criarJob() {
         inicio:
             new Date(),
 
-        fim: null,
+        fim:
+            null,
 
-        erro: null,
+        erro:
+            null,
 
-        resultado: null,
+        resultado:
+            null,
 
-        logs: []
+        logs:
+            []
 
     };
 
@@ -69,41 +98,7 @@ function criarJob() {
     );
 
 
-    adicionarLog(
-        id,
-        "Processo de backup criado."
-    );
-
-
     return job;
-}
-
-
-// ======================================================
-// ADICIONAR LOG
-// ======================================================
-
-function adicionarLog(
-    id,
-    mensagem
-) {
-
-    const job =
-        jobs.get(id);
-
-    if (!job) {
-        return;
-    }
-
-
-    job.logs.push({
-
-        horario:
-            new Date(),
-
-        mensagem
-
-    });
 
 }
 
@@ -120,6 +115,7 @@ function atualizarJob(
     const job =
         jobs.get(id);
 
+
     if (!job) {
         return;
     }
@@ -129,16 +125,6 @@ function atualizarJob(
         job,
         dados
     );
-
-
-    if (dados.mensagem) {
-
-        adicionarLog(
-            id,
-            dados.mensagem
-        );
-
-    }
 
 }
 
@@ -151,7 +137,85 @@ function obterJob(
     id
 ) {
 
-    return jobs.get(id);
+    return jobs.get(
+        id
+    );
+
+}
+
+
+// ======================================================
+// LOG
+// ======================================================
+
+async function adicionarLog(
+    job,
+    etapa,
+    mensagem,
+    nivel = "INFO",
+    detalhes = null,
+    dbPool = null
+) {
+
+    const registro = {
+
+        data_hora:
+            new Date(),
+
+        etapa,
+
+        nivel,
+
+        mensagem,
+
+        detalhes
+
+    };
+
+
+    job.logs.push(
+        registro
+    );
+
+
+    atualizarJob(
+        job.id,
+        {
+
+            etapa,
+
+            mensagem
+
+        }
+    );
+
+
+    try {
+
+        await registrarLog(
+            {
+                execucaoId:
+                    job.id,
+
+                etapa,
+
+                mensagem,
+
+                nivel,
+
+                detalhes
+            },
+            dbPool
+        );
+
+    } catch (erro) {
+
+        console.error(
+            "Erro ao persistir log:",
+            erro.message
+        );
+
+    }
 
 }
 
@@ -165,23 +229,131 @@ async function executarBackup(
     opcoes = {}
 ) {
 
+    let dbPool = null;
+    let decisao = null;
+    let resultadoManutencao = null;
+    let resultadoBackup = null;
+    let arquivoAtual = null;
+    let resultadoRetencao = null;
+    let resultadoCopia = null;
+    let chaveAesProtegida = null;
+    let ivAesProtegido = null;
+
     try {
 
         const {
 
-            forcarManutencao = false,
+            conexaoBanco,
 
-            criptografar = false,
+            bancoDados,
 
-            compactar = false,
+            forcarManutencao =
+            false,
 
-            quantidadeRetencao = 5,
+            criptografar =
+            false,
 
-            destinoSecundario = null,
+            compactar =
+            false,
 
-            diretorioPrincipal = null
+            quantidadeRetencao =
+            5,
+
+            diretorioPrincipal,
+
+            destinoSecundario =
+            null
 
         } = opcoes;
+
+
+        // ==================================================
+        // CONFIGURAÇÃO
+        // ==================================================
+
+        const conexao =
+            validarConfig(
+                conexaoBanco
+            );
+
+
+        // ==================================================
+        // CONEXÃO
+        // ==================================================
+
+        dbPool =
+            criarPool(
+                conexao
+            );
+
+
+        await dbPool.query(
+            "SELECT 1"
+        );
+
+
+        // ==================================================
+        // CRIAR HISTÓRICO
+        // ==================================================
+
+        try {
+
+            await criarExecucao(
+                {
+
+                    id:
+                        job.id,
+
+                    bancoDados:
+                        conexao.database,
+
+                    dataInicio:
+                        job.inicio,
+
+                    operacao:
+                        "BACKUP",
+
+                    quantidadeRetencao,
+
+                    destinoPrincipal:
+                        diretorioPrincipal,
+
+                    destinoSecundario,
+
+                    criptografado:
+                        criptografar,
+
+                    compactado:
+                        compactar
+
+                },
+                dbPool
+            );
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao criar histórico:",
+                erro.message
+            );
+
+        }
+
+
+        await adicionarLog(
+            job,
+            "INICIANDO",
+            `Processo iniciado. ID: ${job.id}`,
+            "INFO",
+            {
+                banco:
+                    conexao.database,
+
+                host:
+                    conexao.host
+            },
+            dbPool
+        );
 
 
         // ==================================================
@@ -192,17 +364,44 @@ async function executarBackup(
             job.id,
             {
 
-                status: "EXECUTANDO",
+                status:
+                    "EXECUTANDO",
 
-                etapa: "VALIDACAO",
+                etapa:
+                    "VALIDACAO",
 
-                progresso: 10,
+                progresso:
+                    10,
 
                 mensagem:
                     "Validando configurações do processo..."
 
             }
         );
+
+
+        await adicionarLog(
+            job,
+            "VALIDACAO",
+            "Validando configurações do processo...",
+            "INFO",
+            null,
+            dbPool
+        );
+
+
+        if (
+            !diretorioPrincipal ||
+            typeof diretorioPrincipal !==
+            "string" ||
+            diretorioPrincipal.trim() === ""
+        ) {
+
+            throw new Error(
+                "O diretório principal é obrigatório."
+            );
+
+        }
 
 
         const quantidade =
@@ -226,19 +425,6 @@ async function executarBackup(
 
 
         if (
-            !diretorioPrincipal
-        ) {
-
-            throw new Error(
-                "O diretório principal é obrigatório."
-            );
-
-        }
-
-
-        // Cria diretório principal
-
-        if (
             !fs.existsSync(
                 diretorioPrincipal
             )
@@ -247,17 +433,17 @@ async function executarBackup(
             fs.mkdirSync(
                 diretorioPrincipal,
                 {
-                    recursive: true
+                    recursive:
+                        true
                 }
             );
 
         }
 
 
-        // Cria diretório secundário
-
         if (
             destinoSecundario &&
+            destinoSecundario.trim() !== "" &&
             !fs.existsSync(
                 destinoSecundario
             )
@@ -266,11 +452,22 @@ async function executarBackup(
             fs.mkdirSync(
                 destinoSecundario,
                 {
-                    recursive: true
+                    recursive:
+                        true
                 }
             );
 
         }
+
+
+        await adicionarLog(
+            job,
+            "VALIDACAO",
+            "Validação concluída com sucesso.",
+            "INFO",
+            null,
+            dbPool
+        );
 
 
         // ==================================================
@@ -281,9 +478,11 @@ async function executarBackup(
             job.id,
             {
 
-                etapa: "MANUTENCAO",
+                etapa:
+                    "MANUTENCAO",
 
-                progresso: 20,
+                progresso:
+                    20,
 
                 mensagem:
                     "Verificando necessidade de manutenção..."
@@ -292,56 +491,94 @@ async function executarBackup(
         );
 
 
+        await adicionarLog(
+            job,
+            "MANUTENCAO",
+            "Verificando necessidade de manutenção...",
+            "INFO",
+            null,
+            dbPool
+        );
+
+
         const ultimaManutencao =
-            await buscarUltimaManutencao();
+            await buscarUltimaManutencao(
+                dbPool
+            );
 
 
-        const decisao =
+        decisao =
             decidirManutencao(
                 ultimaManutencao,
                 forcarManutencao
             );
 
 
-        atualizarJob(
-            job.id,
+        await adicionarLog(
+            job,
+            "MANUTENCAO",
+            `Decisão de manutenção: ${decisao.acao}.`,
+            "INFO",
             {
 
-                mensagem:
-                    `Executando manutenção: ${decisao.acao}`
+                regra:
+                    decisao.regra,
 
-            }
+                acao:
+                    decisao.acao,
+
+                manual:
+                    forcarManutencao
+
+            },
+            dbPool
         );
 
 
-        const resultadoManutencao =
+        resultadoManutencao =
             await executarManutencao(
-                decisao.acao
+                decisao.acao,
+                dbPool
             );
 
 
-        await registrarManutencao({
+        await registrarManutencao(
+            {
 
-            inicio:
-                resultadoManutencao.inicio ||
-                new Date(),
+                inicio:
+                    resultadoManutencao.inicio ||
+                    new Date(),
 
-            fim:
-                resultadoManutencao.fim ||
-                new Date(),
+                fim:
+                    resultadoManutencao.fim ||
+                    new Date(),
 
-            regra:
-                decisao.regra,
+                regra:
+                    decisao.regra,
 
-            status:
-                resultadoManutencao.sucesso
-                    ? "SUCESSO"
-                    : "FALHA",
+                status:
+                    resultadoManutencao.sucesso
+                        ? "SUCESSO"
+                        : "FALHA",
 
-            mensagem:
-                resultadoManutencao.mensagem
+                mensagem:
+                    resultadoManutencao.mensagem
 
-        });
+            },
+            dbPool
+        );
+
+
+        await adicionarLog(
+            job,
+            "MANUTENCAO",
+            resultadoManutencao.mensagem,
+            resultadoManutencao.sucesso
+                ? "INFO"
+                : "ERROR",
+            null,
+            dbPool
+        );
 
 
         if (
@@ -364,9 +601,11 @@ async function executarBackup(
             job.id,
             {
 
-                etapa: "BACKUP",
+                etapa:
+                    "BACKUP",
 
-                progresso: 40,
+                progresso:
+                    40,
 
                 mensagem:
                     "Gerando backup do banco de dados..."
@@ -375,34 +614,68 @@ async function executarBackup(
         );
 
 
-        const resultadoBackup =
+        await adicionarLog(
+            job,
+            "BACKUP",
+            "Gerando backup do banco de dados...",
+            "INFO",
+            null,
+            dbPool
+        );
+
+
+        resultadoBackup =
             await criarBackup(
+                conexao,
                 diretorioPrincipal
             );
 
 
         await registrarBackup(
+            dbPool,
             resultadoBackup
         );
 
 
-        let arquivoAtual =
+        arquivoAtual =
             resultadoBackup.caminho;
+
+
+        await adicionarLog(
+            job,
+            "BACKUP",
+            "Backup do banco de dados gerado com sucesso.",
+            "INFO",
+            {
+
+                arquivo:
+                    resultadoBackup.arquivo,
+
+                tamanho:
+                    resultadoBackup.tamanho
+
+            },
+            dbPool
+        );
 
 
         // ==================================================
         // ETAPA 4 - AES
         // ==================================================
 
-        if (criptografar) {
+        if (
+            criptografar
+        ) {
 
             atualizarJob(
                 job.id,
                 {
 
-                    etapa: "CRIPTOGRAFIA",
+                    etapa:
+                        "CRIPTOGRAFIA",
 
-                    progresso: 55,
+                    progresso:
+                        55,
 
                     mensagem:
                         "Criptografando o backup com AES..."
@@ -411,14 +684,42 @@ async function executarBackup(
             );
 
 
+            await adicionarLog(
+                job,
+                "CRIPTOGRAFIA",
+                "Criptografando o backup com AES...",
+                "INFO",
+                null,
+                dbPool
+            );
+
             const resultadoAES =
                 await criptografarAES(
                     arquivoAtual
                 );
 
-
             arquivoAtual =
                 resultadoAES.caminho;
+
+            chaveAesProtegida =
+                protegerSegredo(
+                    resultadoAES.chave
+                );
+
+            ivAesProtegido =
+                protegerSegredo(
+                    resultadoAES.iv
+                );
+
+
+            await adicionarLog(
+                job,
+                "CRIPTOGRAFIA",
+                "Criptografia AES concluída.",
+                "INFO",
+                null,
+                dbPool
+            );
 
         }
 
@@ -427,15 +728,19 @@ async function executarBackup(
         // ETAPA 5 - ZIP
         // ==================================================
 
-        if (compactar) {
+        if (
+            compactar
+        ) {
 
             atualizarJob(
                 job.id,
                 {
 
-                    etapa: "COMPACTACAO",
+                    etapa:
+                        "COMPACTACAO",
 
-                    progresso: 70,
+                    progresso:
+                        70,
 
                     mensagem:
                         "Compactando o backup..."
@@ -444,29 +749,52 @@ async function executarBackup(
             );
 
 
+            await adicionarLog(
+                job,
+                "COMPACTACAO",
+                "Compactando o backup com proteção por senha...",
+                "INFO",
+                null,
+                dbPool
+            );
+
+
             const resultadoZIP =
                 await compactarZIP(
-                    arquivoAtual
+                    arquivoAtual,
+                    process.env.ZIP_PASSWORD
                 );
 
 
             arquivoAtual =
                 resultadoZIP.caminho;
 
+
+            await adicionarLog(
+                job,
+                "COMPACTACAO",
+                "Compactação ZIP concluída.",
+                "INFO",
+                null,
+                dbPool
+            );
+
         }
 
 
         // ==================================================
-        // ETAPA 6 - CÓPIA PRINCIPAL
+        // ETAPA 6 - DESTINO PRINCIPAL
         // ==================================================
 
         atualizarJob(
             job.id,
             {
 
-                etapa: "COPIA_PRINCIPAL",
+                etapa:
+                    "COPIA_PRINCIPAL",
 
-                progresso: 80,
+                progresso:
+                    80,
 
                 mensagem:
                     "Copiando backup para o diretório principal..."
@@ -482,25 +810,34 @@ async function executarBackup(
             );
 
 
-        // ==================================================
-        // ETAPA 7 - CÓPIA SECUNDÁRIA
-        // ==================================================
+        await adicionarLog(
+            job,
+            "COPIA_PRINCIPAL",
+            "Backup copiado para o diretório principal.",
+            "INFO",
+            null,
+            dbPool
+        );
 
-        let resultadoDestinoSecundario =
-            null;
 
+        // ==================================================
+        // ETAPA 7 - DESTINO SECUNDÁRIO
+        // ==================================================
 
         if (
-            destinoSecundario
+            destinoSecundario &&
+            destinoSecundario.trim() !== ""
         ) {
 
             atualizarJob(
                 job.id,
                 {
 
-                    etapa: "COPIA_SECUNDARIA",
+                    etapa:
+                        "COPIA_SECUNDARIA",
 
-                    progresso: 88,
+                    progresso:
+                        90,
 
                     mensagem:
                         "Copiando backup para o destino secundário..."
@@ -509,11 +846,21 @@ async function executarBackup(
             );
 
 
-            resultadoDestinoSecundario =
+            resultadoCopia =
                 await copiarParaDestino(
                     arquivoAtual,
                     destinoSecundario
                 );
+
+
+            await adicionarLog(
+                job,
+                "COPIA_SECUNDARIA",
+                "Cópia para o destino secundário concluída.",
+                "INFO",
+                null,
+                dbPool
+            );
 
         }
 
@@ -526,9 +873,11 @@ async function executarBackup(
             job.id,
             {
 
-                etapa: "RETENCAO",
+                etapa:
+                    "RETENCAO",
 
-                progresso: 95,
+                progresso:
+                    95,
 
                 mensagem:
                     "Aplicando política de retenção..."
@@ -537,32 +886,58 @@ async function executarBackup(
         );
 
 
-        const resultadoRetencao =
+        resultadoRetencao =
             aplicarRetencao(
                 diretorioPrincipal,
                 quantidade
             );
 
 
+        await adicionarLog(
+            job,
+            "RETENCAO",
+            `Política de retenção aplicada. Mantendo os últimos ${quantidade} backups.`,
+            "INFO",
+            {
+
+                mantidos:
+                    resultadoRetencao?.mantidos?.length ||
+                    0,
+
+                removidos:
+                    resultadoRetencao?.removidos?.length ||
+                    0
+
+            },
+            dbPool
+        );
+
+
         // ==================================================
-        // FINALIZAÇÃO
+        // FINALIZAR
         // ==================================================
+
+        const fim =
+            new Date();
+
 
         atualizarJob(
             job.id,
             {
 
-                status: "CONCLUIDO",
+                status:
+                    "CONCLUIDO",
 
-                etapa: "FINALIZADO",
+                etapa:
+                    "FINALIZADO",
 
-                progresso: 100,
+                progresso:
+                    100,
 
                 mensagem:
                     "Backup concluído com sucesso.",
 
-                fim:
-                    new Date(),
+                fim,
 
                 resultado: {
 
@@ -592,7 +967,7 @@ async function executarBackup(
                         resultadoDestinoPrincipal,
 
                     destinoSecundario:
-                        resultadoDestinoSecundario,
+                        resultadoCopia,
 
                     retencao:
                         resultadoRetencao
@@ -603,6 +978,62 @@ async function executarBackup(
         );
 
 
+        await adicionarLog(
+            job,
+            "FINALIZADO",
+            "Backup concluído com sucesso.",
+            "INFO",
+            null,
+            dbPool
+        );
+
+
+        try {
+
+            await finalizarExecucao(
+                {
+                    id:
+                        job.id,
+
+                    dataFim:
+                        fim,
+
+                    status:
+                        "SUCESSO",
+
+                    mensagem:
+                        "Backup concluído com sucesso.",
+
+                    regraManutencao:
+                        decisao?.regra ||
+                        null,
+
+                    manutencaoStatus:
+                        resultadoManutencao?.sucesso
+                            ? "SUCESSO"
+                            : "FALHA",
+
+                    arquivoBackup:
+                        arquivoAtual,
+
+                    chaveAes:
+                        chaveAesProtegida,
+
+                    ivAes:
+                        ivAesProtegido
+                },
+                dbPool
+            );
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao finalizar histórico:",
+                erro.message
+            );
+
+        }
+
     } catch (erro) {
 
         console.error(
@@ -611,15 +1042,32 @@ async function executarBackup(
         );
 
 
+        const fim =
+            new Date();
+
+
+        await adicionarLog(
+            job,
+            "ERRO",
+            `Processo interrompido: ${erro.message}`,
+            "ERROR",
+            null,
+            dbPool
+        );
+
+
         atualizarJob(
             job.id,
             {
 
-                status: "FALHA",
+                status:
+                    "FALHA",
 
-                etapa: "ERRO",
+                etapa:
+                    "ERRO",
 
-                progresso: 100,
+                progresso:
+                    100,
 
                 mensagem:
                     "O processo de backup falhou.",
@@ -627,11 +1075,145 @@ async function executarBackup(
                 erro:
                     erro.message,
 
-                fim:
-                    new Date()
+                fim
 
             }
         );
+
+
+        if (dbPool) {
+
+            try {
+
+                await finalizarExecucao(
+                    {
+                        id:
+                            job.id,
+
+                        dataFim:
+                            fim,
+
+                        status:
+                            "SUCESSO",
+
+                        mensagem:
+                            "Backup concluído com sucesso.",
+
+                        regraManutencao:
+                            decisao?.regra ||
+                            null,
+
+                        manutencaoStatus:
+                            resultadoManutencao?.sucesso
+                                ? "SUCESSO"
+                                : "FALHA",
+
+                        arquivoBackup:
+                            arquivoAtual,
+
+                        chaveAes:
+                            chaveAesProtegida,
+
+                        ivAes:
+                            ivAesProtegido
+                    },
+                    dbPool
+                );
+
+            } catch (erro) {
+
+                console.error(
+                    "Erro no job de backup:",
+                    erro.message
+                );
+
+
+                const fim =
+                    new Date();
+
+
+                await adicionarLog(
+                    job,
+                    "ERRO",
+                    `Processo interrompido: ${erro.message}`,
+                    "ERROR",
+                    null,
+                    dbPool
+                );
+
+
+                atualizarJob(
+                    job.id,
+                    {
+                        status:
+                            "FALHA",
+
+                        etapa:
+                            "ERRO",
+
+                        progresso:
+                            0,
+
+                        mensagem:
+                            "O processo de backup falhou.",
+
+                        erro:
+                            erro.message,
+
+                        fim
+                    }
+                );
+
+
+                try {
+
+                    await finalizarExecucao(
+                        {
+                            id:
+                                job.id,
+
+                            dataFim:
+                                fim,
+
+                            status:
+                                "SUCESSO",
+
+                            mensagem:
+                                "Backup concluído com sucesso.",
+
+                            regraManutencao:
+                                decisao?.regra ||
+                                null,
+
+                            manutencaoStatus:
+                                resultadoManutencao?.sucesso
+                                    ? "SUCESSO"
+                                    : "FALHA",
+
+                            arquivoBackup:
+                                arquivoAtual,
+
+                            chaveAes:
+                                chaveAesProtegida,
+
+                            ivAes:
+                                ivAesProtegido
+                        },
+                        dbPool
+                    );
+
+                } catch (logErro) {
+
+                    console.error(
+                        "Erro ao finalizar histórico:",
+                        logErro.message
+                    );
+
+                }
+
+            }
+
+        }
 
     }
 
@@ -656,19 +1238,10 @@ function iniciarBackup(
     );
 
 
-    return {
-
-        jobId:
-            job.id
-
-    };
+    return job;
 
 }
 
-
-// ======================================================
-// EXPORTS
-// ======================================================
 
 module.exports = {
 

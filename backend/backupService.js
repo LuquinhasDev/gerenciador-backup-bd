@@ -1,146 +1,236 @@
-const { spawn } = require("child_process");
-const path = require("path");
-const fs = require("fs");
+// backupService.js
 
-const pool = require("./database");
+const {
+    spawn
+} = require("child_process");
 
-async function criarBackup(pastaBackups) {
+const {
+    obterPgDump
+} = require("./executableService");
 
-    return new Promise((resolve, reject) => {
+const path =
+    require("path");
 
-        const inicio = new Date();
+const fs =
+    require("fs");
 
-        // Se nenhuma pasta for informada,
-        // utiliza a pasta padrão do projeto.
-        if (!pastaBackups) {
-            pastaBackups = path.join(
-                __dirname,
-                "..",
-                "backups"
-            );
-        }
 
-        if (!fs.existsSync(pastaBackups)) {
+// ======================================================
+// CRIAR BACKUP
+// ======================================================
 
-            fs.mkdirSync(
-                pastaBackups,
-                {
-                    recursive: true
-                }
-            );
+async function criarBackup(
+    conexao,
+    pastaBackups
+) {
 
-        }
+    return new Promise(
+        (resolve, reject) => {
 
-        const nomeArquivo =
-            `backup_${new Date()
-                .toISOString()
-                .replace(/[:.]/g, "-")}.dump`;
+            const inicio =
+                new Date();
 
-        const caminhoBackup =
-            path.join(
-                pastaBackups,
-                nomeArquivo
-            );
 
-        const processo = spawn("pg_dump", [
+            if (!pastaBackups) {
 
-            "-h",
-            process.env.DB_HOST,
-
-            "-p",
-            process.env.DB_PORT,
-
-            "-U",
-            process.env.DB_USER,
-
-            "-F",
-            "c",
-
-            "-f",
-            caminhoBackup,
-
-            process.env.DB_NAME
-
-        ], {
-
-            env: {
-                ...process.env,
-                PGPASSWORD:
-                    process.env.DB_PASSWORD
-            }
-
-        });
-
-        let erro = "";
-
-        processo.stderr.on(
-            "data",
-            (data) => {
-
-                erro += data.toString();
-
-            }
-        );
-
-        processo.on(
-            "error",
-            (err) => {
-
-                reject(err);
-
-            }
-        );
-
-        processo.on(
-            "close",
-            (codigo) => {
-
-                const fim = new Date();
-
-                if (codigo !== 0) {
-
-                    reject(
-                        new Error(
-                            erro ||
-                            `pg_dump terminou com código ${codigo}`
-                        )
+                pastaBackups =
+                    path.join(
+                        __dirname,
+                        "..",
+                        "backups"
                     );
 
-                    return;
-                }
+            }
 
-                const tamanho =
-                    fs.statSync(
-                        caminhoBackup
-                    ).size;
 
-                resolve({
+            if (
+                !fs.existsSync(
+                    pastaBackups
+                )
+            ) {
 
-                    sucesso: true,
-
-                    arquivo:
-                        nomeArquivo,
-
-                    caminho:
-                        caminhoBackup,
-
-                    tamanho,
-
-                    inicio,
-
-                    fim
-
-                });
+                fs.mkdirSync(
+                    pastaBackups,
+                    {
+                        recursive:
+                            true
+                    }
+                );
 
             }
-        );
 
-    });
+
+            const nomeArquivo =
+                `backup_${new Date()
+                    .toISOString()
+                    .replace(
+                        /[:.]/g,
+                        "-"
+                    )}.dump`;
+
+
+            const caminhoBackup =
+                path.join(
+                    pastaBackups,
+                    nomeArquivo
+                );
+
+
+            const processo =
+                spawn(
+                     obterPgDump(),
+                    [
+                        "-h",
+                        conexao.host,
+
+                        "-p",
+                        String(
+                            conexao.port
+                        ),
+
+                        "-U",
+                        conexao.user,
+
+                        "-F",
+                        "c",
+
+                        "-f",
+                        caminhoBackup,
+
+                        conexao.database
+                    ],
+                    {
+                        env: {
+                            ...process.env,
+
+                            PGPASSWORD:
+                                conexao.password
+                        }
+                    }
+                );
+
+
+            let erro =
+                "";
+
+
+            processo.stderr.on(
+                "data",
+                data => {
+
+                    erro +=
+                        data.toString();
+
+                }
+            );
+
+
+            processo.on(
+                "error",
+                erroProcesso => {
+
+                    reject(
+                        erroProcesso
+                    );
+
+                }
+            );
+
+
+            processo.on(
+                "close",
+                codigo => {
+
+                    const fim =
+                        new Date();
+
+
+                    if (
+                        codigo !== 0
+                    ) {
+
+                        reject(
+                            new Error(
+                                erro ||
+                                `pg_dump terminou com código ${codigo}`
+                            )
+                        );
+
+                        return;
+
+                    }
+
+
+                    if (
+                        !fs.existsSync(
+                            caminhoBackup
+                        )
+                    ) {
+
+                        reject(
+                            new Error(
+                                "O pg_dump terminou, mas o arquivo de backup não foi criado."
+                            )
+                        );
+
+                        return;
+
+                    }
+
+
+                    const tamanho =
+                        fs.statSync(
+                            caminhoBackup
+                        ).size;
+
+
+                    resolve({
+
+                        sucesso:
+                            true,
+
+                        arquivo:
+                            nomeArquivo,
+
+                        caminho:
+                            caminhoBackup,
+
+                        tamanho,
+
+                        inicio,
+
+                        fim
+
+                    });
+
+                }
+            );
+
+        }
+    );
 
 }
 
 
-async function registrarBackup(resultado) {
+// ======================================================
+// REGISTRAR BACKUP
+// ======================================================
+
+async function registrarBackup(
+    dbPool,
+    resultado
+) {
+
+    if (
+        !dbPool
+    ) {
+
+        throw new Error(
+            "Pool do banco não informado para registrar o backup."
+        );
+
+    }
+
 
     const duracao =
         Math.round(
@@ -150,8 +240,9 @@ async function registrarBackup(resultado) {
             ) / 1000
         );
 
-    await pool.query(`
 
+    await dbPool.query(
+        `
         INSERT INTO historico_manutencao
         (
             data_hora,
@@ -164,7 +255,6 @@ async function registrarBackup(resultado) {
             mensagem,
             banco_dados
         )
-
         VALUES
         (
             NOW(),
@@ -177,25 +267,28 @@ async function registrarBackup(resultado) {
             $5,
             current_database()
         )
+        `,
+        [
+            duracao,
 
-    `, [
+            resultado.sucesso
+                ? "SUCESSO"
+                : "FALHA",
 
-        duracao,
+            resultado.inicio,
 
-        resultado.sucesso
-            ? "SUCESSO"
-            : "FALHA",
+            resultado.fim,
 
-        resultado.inicio,
-
-        resultado.fim,
-
-        `Arquivo: ${resultado.arquivo} | Tamanho: ${resultado.tamanho} bytes`
-
-    ]);
+            `Arquivo: ${resultado.arquivo} | Tamanho: ${resultado.tamanho} bytes`
+        ]
+    );
 
 }
 
+
+// ======================================================
+// EXPORTS
+// ======================================================
 
 module.exports = {
 

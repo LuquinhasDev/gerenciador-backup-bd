@@ -1,62 +1,103 @@
-const fs = require("fs");
-const path = require("path");
+// fileService.js
+
+const fs =
+    require("fs");
+
+const path =
+    require("path");
 
 
-function listarBackups(pasta) {
+// ======================================================
+// LISTAR BACKUPS
+// ======================================================
 
-    if (!fs.existsSync(pasta)) {
+function listarBackups(
+    pasta
+) {
+
+    if (
+        !fs.existsSync(
+            pasta
+        )
+    ) {
 
         return [];
 
     }
 
-    return fs.readdirSync(pasta)
 
-        .filter(nome => {
+    return fs
+        .readdirSync(
+            pasta
+        )
 
-            return (
-                nome.startsWith("backup_") &&
-                (
-                    nome.endsWith(".dump") ||
-                    nome.endsWith(".dump.enc") ||
-                    nome.endsWith(".dump.zip") ||
-                    nome.endsWith(".dump.enc.zip")
-                )
-            );
+        .filter(
+            nome => {
 
-        })
-
-        .map(nome => {
-
-            const caminho =
-                path.join(
-                    pasta,
-                    nome
+                return (
+                    nome.startsWith(
+                        "backup_"
+                    ) &&
+                    (
+                        nome.endsWith(
+                            ".dump"
+                        ) ||
+                        nome.endsWith(
+                            ".dump.enc"
+                        ) ||
+                        nome.endsWith(
+                            ".dump.zip"
+                        ) ||
+                        nome.endsWith(
+                            ".dump.enc.zip"
+                        )
+                    )
                 );
 
-            const stats =
-                fs.statSync(caminho);
+            }
+        )
 
-            return {
+        .map(
+            nome => {
 
-                nome,
+                const caminho =
+                    path.join(
+                        pasta,
+                        nome
+                    );
 
-                caminho,
+                const stats =
+                    fs.statSync(
+                        caminho
+                    );
 
-                data:
-                    stats.mtime.getTime()
 
-            };
+                return {
 
-        })
+                    nome,
+
+                    caminho,
+
+                    data:
+                        stats.mtime.getTime()
+
+                };
+
+            }
+        )
 
         .sort(
             (a, b) =>
-                b.data - a.data
+                b.data -
+                a.data
         );
 
 }
 
+
+// ======================================================
+// APLICAR RETENÇÃO
+// ======================================================
 
 function aplicarRetencao(
     pasta,
@@ -64,9 +105,12 @@ function aplicarRetencao(
 ) {
 
     if (
-        quantidadeManter === undefined ||
-        quantidadeManter === null ||
-        quantidadeManter === ""
+        quantidadeManter ===
+            undefined ||
+        quantidadeManter ===
+            null ||
+        quantidadeManter ===
+            ""
     ) {
 
         return {
@@ -78,13 +122,17 @@ function aplicarRetencao(
 
     }
 
+
     const quantidade =
         Number(
             quantidadeManter
         );
 
+
     if (
-        !Number.isInteger(quantidade) ||
+        !Number.isInteger(
+            quantidade
+        ) ||
         quantidade < 1
     ) {
 
@@ -94,10 +142,12 @@ function aplicarRetencao(
 
     }
 
+
     const backups =
         listarBackups(
             pasta
         );
+
 
     const manter =
         backups.slice(
@@ -105,10 +155,12 @@ function aplicarRetencao(
             quantidade
         );
 
+
     const remover =
         backups.slice(
             quantidade
         );
+
 
     for (
         const backup
@@ -123,6 +175,7 @@ function aplicarRetencao(
         );
 
     }
+
 
     return {
 
@@ -143,6 +196,10 @@ function aplicarRetencao(
 }
 
 
+// ======================================================
+// COPIAR PARA DESTINO
+// ======================================================
+
 async function copiarParaDestino(
     caminhoArquivo,
     destino
@@ -152,7 +209,8 @@ async function copiarParaDestino(
 
         return {
 
-            copiado: false,
+            copiado:
+                false,
 
             motivo:
                 "Destino adicional não informado."
@@ -161,21 +219,29 @@ async function copiarParaDestino(
 
     }
 
-    if (!fs.existsSync(destino)) {
+
+    if (
+        !fs.existsSync(
+            destino
+        )
+    ) {
 
         fs.mkdirSync(
             destino,
             {
-                recursive: true
+                recursive:
+                    true
             }
         );
 
     }
 
+
     const nomeArquivo =
         path.basename(
             caminhoArquivo
         );
+
 
     const destinoFinal =
         path.join(
@@ -183,14 +249,17 @@ async function copiarParaDestino(
             nomeArquivo
         );
 
+
     await fs.promises.copyFile(
         caminhoArquivo,
         destinoFinal
     );
 
+
     return {
 
-        copiado: true,
+        copiado:
+            true,
 
         origem:
             caminhoArquivo,
@@ -202,6 +271,10 @@ async function copiarParaDestino(
 
 }
 
+
+// ======================================================
+// EXPORTS
+// ======================================================
 
 module.exports = {
 

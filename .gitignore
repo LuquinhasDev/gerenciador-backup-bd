@@ -1,4 +1,14 @@
-node_modules/
-.env
-.env.*
-!.env.example
+# Dependências
+backend/node_modules/
+
+# Variáveis de ambiente
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Backups gerados pelo sistema
+backups/
+
+# Arquivos temporários
+*.tmp
+*.log
