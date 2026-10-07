@@ -85,8 +85,6 @@ gerenciador-backup-bd/
 │   ├── package.json
 │   └── package-lock.json
 │
-├── backups/
-│
 ├── database/
 │   ├── 01_criar_tabelas.sql
 │   ├── 02_alterar_historico_manutencao.sql
