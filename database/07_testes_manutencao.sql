@@ -92,8 +92,8 @@ VALUES
 -- Execute este comando separadamente após finalizar
 -- os testes anteriores.
 
--- DELETE FROM historico_manutencao
--- WHERE tipo_operacao = 'MANUTENCAO';
+DELETE FROM historico_manutencao
+WHERE tipo_operacao = 'MANUTENCAO';
 
 
 -- ==========================================================
